@@ -1,0 +1,4 @@
+segment_id,plan_a,plan_b,conflict_points,start_idx_a,end_idx_a,start_idx_b,end_idx_b,required_shift,cells
+0,4,56,1,5,5,32,32,62.97917075312972,15:26:2
+1,24,95,1,26,26,51,51,39.53967818327102,28:51:2
+2,36,94,1,16,16,19,19,31.67553356162547,37:19:2

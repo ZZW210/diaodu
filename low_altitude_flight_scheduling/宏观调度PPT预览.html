@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>任务四：宏观起飞前调度 — FATA 优化调度进展（PPT 预览）</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#e9edf4; font-family:"Microsoft YaHei","Segoe UI",sans-serif; padding:24px; }
+  .slide { width:1280px; height:720px; margin:0 auto; background:#fff; position:relative; overflow:hidden;
+           box-shadow:0 6px 30px rgba(16,40,90,.25); }
+
+  /* ===== 顶部横幅 ===== */
+  .topbar { position:absolute; left:0; top:0; width:1280px; height:88px;
+    background:linear-gradient(90deg,#123a7c 0%,#1f4e9c 60%,#2f6fed 100%); color:#fff; }
+  .topbar .title { position:absolute; left:42px; top:16px; font-size:27px; font-weight:700; letter-spacing:1px; }
+  .topbar .sub { position:absolute; left:44px; top:56px; font-size:12.5px; opacity:.9; }
+  .logo { position:absolute; right:36px; top:14px; width:148px; height:60px; border:1px dashed rgba(255,255,255,.7);
+    border-radius:6px; display:flex; align-items:center; justify-content:center;
+    font-size:12px; color:rgba(255,255,255,.85); text-align:center; line-height:1.4; }
+
+  /* ===== 两阶段调度框架(顶部) ===== */
+  .frame { position:absolute; left:42px; top:98px; width:1196px; height:70px;
+    background:linear-gradient(90deg,#123a7c,#1f4e9c); border-radius:10px;
+    display:flex; align-items:center; padding:0 18px; color:#fff; }
+  .frame .ftitle { font-size:16px; font-weight:700; white-space:nowrap; margin-right:20px; }
+  .fbox { background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.45);
+    border-radius:8px; padding:6px 14px; font-size:13px; text-align:center; line-height:1.35; }
+  .fbox b { font-size:14px; }
+  .farrow { font-size:16px; margin:0 14px; font-weight:700; white-space:nowrap; }
+
+  /* ===== 内容卡片 ===== */
+  .quad { position:absolute; width:586px; height:232px; background:#fff; border:1.5px solid #c7d9f5;
+    border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(16,40,90,.07); }
+  .q1 { left:42px;  top:180px; height:210px; }
+  .q2 { left:42px;  top:398px; height:300px; }
+  .q3 { left:652px; top:180px; }
+  .q4 { left:652px; top:422px; }
+  .qhead.center { justify-content:center; font-size:17px; letter-spacing:1px; }
+  .qhead { height:36px; background:#1f4e9c; color:#fff; font-size:15.5px; font-weight:700;
+    display:flex; align-items:center; padding:0 14px; }
+  .qhead span { margin-right:8px; }
+  .q2 .qbody { height:calc(300px - 36px); flex-direction:column; }
+  .q2 .row2 { display:flex; height:150px; align-items:stretch; }
+  .q2 .row2 img { width:200px; height:100%; object-fit:contain; background:#f7f9fd; padding:4px; }
+  .q2 .mid { flex:1; padding:6px 10px; font-size:10.8px; line-height:1.4; }
+  .q2 .bot { flex:1; padding:6px 12px; font-size:11px; line-height:1.5; }
+  .q2 .mid ul, .q2 .bot ul { padding-left:13px; margin:0; }
+  .q2 .mid li, .q2 .bot li { margin-bottom:3px; }
+  .q2 .mid b, .q2 .bot b { color:#123a7c; }
+  .qbody { display:flex; height:calc(232px - 36px); }
+  .qbody img { width:262px; height:100%; object-fit:cover; }
+  .qtext { flex:1; padding:6px 12px; font-size:11.8px; color:#24303f; line-height:1.45; }
+  .qtext li { margin-bottom:4px; }
+  .qtext b { color:#123a7c; }
+  .hl { color:#0f8a3d; font-weight:700; }
+
+  /* ===== 右侧微观占位 ===== */
+  .ph { display:flex; align-items:center; justify-content:center; height:calc(232px - 36px);
+    background:#f7f9fd; border-top:1.5px dashed #c7d9f5; color:#8fa3bd; font-size:13px; }
+0
+  /* ===== MARL 流程图 / 宏观流程图 ===== */
+  .bpmn { display:flex; align-items:center; gap:4px; padding:8px 10px; height:calc(232px - 36px);
+    font-size:10.5px; line-height:1.3; }
+  .flow { display:flex; align-items:center; gap:4px; padding:8px 10px; height:calc(218px - 62px);
+    font-size:10.5px; line-height:1.3; }
+  .flow-desc { position:absolute; left:12px; right:12px; bottom:5px; font-size:10.5px;
+    color:#24303f; line-height:1.35; }
+  .flow-desc b { color:#123a7c; }
+  .bpmn-box { background:#eef4ff; border:1.5px solid #1f4e9c; border-radius:6px; padding:5px 6px;
+    text-align:center; color:#123a7c; min-width:64px; }
+  .bpmn-box.big { min-width:92px; padding:7px 6px; }
+  .bpmn-box.wide { background:#1f4e9c; color:#fff; border-color:#1f4e9c; min-width:96px; }
+  .bpmn-col { display:flex; flex-direction:column; gap:5px; }
+  .bpmn-arrow { color:#1f4e9c; font-weight:700; font-size:13px; white-space:nowrap; }
+  .bpmn-note { position:absolute; right:12px; bottom:4px; font-size:10px; color:#5b6b7f; }
+  .flow-out { position:absolute; left:12px; bottom:6px; font-size:10px; color:#0d9488; font-weight:700; }
+
+  /* ===== 下方小卡片(仿左侧卡片样式) ===== */
+  .mini { position:absolute; left:652px; width:586px; height:108px; background:#fff;
+    bordleft { left:42px; }
+  .mini.mc1 { top:408px; height:119px; }
+  .mini.mc2 { top:535px; height:119px; }
+  .mbody-img { display:flex; height:calc(119px - 30px); }
+  .mbody-img img { width:168px; height:100%; object-fit:cover; }
+  .mtext { flex:1; padding:5px 10px; font-size:10.8px; color:#24303f; line-height:1.35; }
+  .mtext li { margin-bottom:3px; }
+  .mtext b { color:#123a7c
+  .mini.ml { left:42px; }
+  .mini.ml1 { top:440px; }
+  .mini.ml2 { top:556px; }
+  .mhead { height:30px; background:#1f4e9c; color:#fff; font-size:14px; font-weight:700;
+    display:flex; align-items:center; padding:0 12px; }
+  .mhead span { margin-right:8px; }
+  .mbody { padding:6px 12px; font-size:11.5px; color:#24303f; line-height:1.4; }
+  .mbody li { margin-bottom:3px; }
+  .mbody b { color:#123a7c; }
+</style>
+</head>
+<body>
+<div class="slide">
+  <!-- 顶部 -->
+  <div class="topbar">
+    <div class="title">任务四：宏观起飞前调度 —— FATA 优化调度进展</div>
+    <div class="sub">揭榜挂帅项目年度进展汇报 · 低空飞行计划优化调度（宏观层）</div>
+    <div class="logo">学院 Logo<br/>（此处替换）</div>
+  </div>
+
+  <!-- 顶部：宏观-微观两阶段调度框架 -->
+  <div class="frame">
+    <div class="ftitle">⚙️ 两阶段调度框架</div>
+    <div class="fbox"><b>宏观起飞前全局调度</b><br/>关键航班识别 → FATA 全局寻优 → 无冲突初始方案</div>
+    <div class="farrow">⇄</div>
+    <div class="fbox" style="background:#0d9488; border-color:rgba(255,255,255,.6);"><b>分层协同接口</b><br/>全局计划下发 / 实时状态反馈</div>
+    <div class="farrow">⇄</div>
+    <div class="fbox"><b>微观飞行中实时响应</b><br/>实时冲突监测 → 动态调度调整</div>
+  </div>
+
+  <!-- 左侧第一块：宏观算法（框图 + 说明文字） -->
+  <div class="quad q1">
+    <div class="qhead center">改进 FATA 两阶段调度算法</div>
+    <div class="flow">
+      <div class="bpmn-box big">全机群初始计划<br/>100 架无人机<br/>OD / 速度 / ETD</div>
+      <div class="bpmn-arrow">→</div>
+      <div class="bpmn-box big">全局冲突探测<br/>初始 215 点 / 132 对</div>
+      <div class="bpmn-arrow">→</div>
+      <div class="bpmn-box big">复杂网络<br/>关键无人机识别<br/>132 节点 / 132 边 · CI</div>
+      <div class="bpmn-arrow">→</div>
+      <div class="bpmn-col">
+        <div class="bpmn-box">阶段① FATA 寻优<br/>地面等待 + 速度调整</div>
+        <div class="bpmn-box">阶段② 局部 A* 改航<br/>兜底消解残留冲突</div>
+      </div>
+      <div class="bpmn-arrow">→</div>
+      <div class="bpmn-box wide">无冲突初始<br/>调度方案</div>
+    </div>
+    <div class="flow-desc">通过<b>改进 FATA 与两阶段优化</b>机制，实现低空飞行计划宏观调度流程：经<b>复杂网络识别关键飞行计划</b>并实施<b>兼顾冲突、延误与风险的多目标寻优</b>，最终获得<b>无冲突初始调度方案</b>。</div>
+  </div>
+
+  <!-- 左侧第二块：宏观评估（左图 + 右文） -->
+  <div class="quad q2">
+    <div class="qhead center">宏观起飞前调度实验评估</div>
+    <div class="qbody">
+      <div class="row2">
+        <img src="outputs/conflict_network.png" alt="冲突网络"/>
+        <div class="mid"><b>① 关键计划识别</b>
+          <ul>
+            <li>初始冲突 215 点 / 132 对（无不确定性 128 点 / 84 对）</li>
+            <li>冲突网络 132 节点 / 132 边</li>
+            <li>CI 识别 Top-10 关键航班</li>
+            <li>99 号核心枢纽（度 6，CI 135）</li>
+          </ul>
+        </div>
+        <img src="outputs/two_stage_routes_before_after.png" alt="优化前后航迹"/>
+      </div>
+      <div class="bot"><b>② 两阶段调度优化</b>
+        <ul>
+          <li>FATA 寻优（等待 + 速度）→ 局部 A* 改航兜底</li>
+          <li>215→4（消除率 98.1%），冲突对 132→4</li>
+          <li>调整 56 架、延误 29 架，风险增比 7.6×10⁻⁵</li>
+          <li>安全模式保证全局单调不劣化</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右侧第一块：Contract-MARL 流程图 -->
+  <div class="quad q3">
+    <div class="qhead"><span>🤖</span>微观 · Contract-MARL 多智能体强化学习流程</div>
+    <div class="bpmn">
+      <div class="bpmn-box">Contract:<br/>普通机冲突让行 VIP<br/>冲突解除后恢复飞行</div>
+      <div class="bpmn-arrow">→</div>
+      <div class="bpmn-box">Contract2<br/>Interface<br/>编译器</div>
+      <div class="bpmn-arrow">→</div>
+      <div class="bpmn-box">Monitor</div>
+      <div class="bpmn-arrow">→</div>
+      <div class="bpmn-col">
+        <div class="bpmn-box">Agent<br/>Reward</div>
+        <div class="bpmn-box">Critic<br/>State</div>
+      </div>
+      <div class="bpmn-arrow">→</div>
+      <div class="bpmn-box wide">MARL 多智能体<br/>强化学习流程</div>
+      <div class="bpmn-arrow">→</div>
+      <div class="bpmn-box">Metrics<br/>评估</div>
+    </div>
+    <div class="bpmn-note">↺ Metrics 评估结果反馈至 Monitor</div>
+  </div>
+
+  <!-- 右侧第二块：两个小卡片（仿左侧样式） -->
+  <div class="mini mini1">
+    <div class="mhead"><span>📋</span>微观 · 关键计划识别</div>
+    <ul class="mbody">
+      <li>基于 <b>Contract 契约</b>识别飞行优先级：<b>VIP 机优先</b>，普通机冲突让行</li>
+      <li>冲突接触解除后<b>自动恢复飞行</b>，保障运行连续性</li>
+    </ul>
+  </div>
+
+  <div class="mini mini2">
+    <div class="mhead"><span>⚙️</span>微观 · 实时调度优化</div>
+    <ul class="mbody">
+      <li><b>MARL 多智能体强化学习</b>：Agent Reward 奖励信号 + Critic State 评判</li>
+      <li><b>Metrics</b> 评估航路恢复、冲突解除等指标并闭环反馈优化</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,3 @@
+method,final_conflicts,final_conflict_pairs,changed_flights,fitness
+two_stage_improved_fata,3,3,65,3071000.773172039
+one_stage_improved_fata,64,59,18,64014000.76570282

@@ -1,0 +1,7 @@
+n_flights,initial_conflicts,remaining_conflicts,delayed_flight_count,runtime_seconds,final_fitness
+50,50,1,0,40.5,6880
+100,256,5,0,102.5,10400
+150,596,136,3,268.0,62180
+200,1047,345,3,512.5,143600
+250,1630,537,3,788.5,218560
+300,2354,776,3,1128.0,311380

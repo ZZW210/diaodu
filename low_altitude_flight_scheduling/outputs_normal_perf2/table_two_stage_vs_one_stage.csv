@@ -1,0 +1,3 @@
+method,final_conflicts,final_conflict_pairs,changed_flights,fitness
+two_stage_delay_speed_safe,4,4,56,4041300.9022382074
+stage1_delay_speed_only,160,92,48,17171170.567508623

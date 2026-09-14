@@ -1,0 +1,2 @@
+plan_a,plan_b,cell_x,cell_y,cell_z,idx_a,idx_b,time_a,time_b,time_gap,time_diff,required_gap,conflict_type
+3,16,34,29,1,15,28,1268.1010697679676,1263.621578362747,4.479491405220642,4.479491405220642,45.0,deterministic

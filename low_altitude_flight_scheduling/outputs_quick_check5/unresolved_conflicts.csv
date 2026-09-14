@@ -1,0 +1,3 @@
+plan_a,plan_b,cell_x,cell_y,cell_z,time_a,time_b,time_gap,required_gap,tried_delay_a,tried_delay_b,tried_speed_a,tried_speed_b,tried_reroute,reason_failed
+3,89,35,30,1,1280.7069174828061,1274.3945911249407,6.312326357865459,77.44615077884208,False,False,False,False,False,remaining_after_repair
+16,84,52,2,1,902.6582663090819,940.8243363940109,-38.16607008492895,82.44667703929895,False,False,False,True,False,remaining_after_repair

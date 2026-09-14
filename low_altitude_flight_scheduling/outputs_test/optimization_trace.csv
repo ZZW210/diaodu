@@ -1,0 +1,1 @@
+stage,iter,action_type,plan_id,old_pairs,new_pairs,old_points,new_points,accepted,runtime_ms,rollback,reason,matched_strategy,conflict_class,segment_idx,segment_points,pair,candidate_rank,prob_delay,prob_speed,prob_reroute,prob_delay_after,prob_speed_after,prob_reroute_after,source
