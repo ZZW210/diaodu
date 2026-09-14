@@ -38,32 +38,66 @@ def collective_influence(graph: nx.Graph, l: int = 2) -> dict[int, float]:
     return scores
 
 
+def weighted_collective_influence(graph: nx.Graph, l: int = 2) -> dict[int, float]:
+    """Collective influence on the weighted conflict network.
+
+    Every conflict point between two flights adds one to the edge weight
+    (``count``), so repeated conflicts on the same pair are counted as many
+    times as they occur instead of being collapsed into a single edge.
+    """
+
+    scores: dict[int, float] = {}
+    strengths = dict(graph.degree(weight="count"))
+    degrees = dict(graph.degree())
+    for node in graph.nodes:
+        if degrees[node] <= 0 or strengths[node] <= 1e-12:
+            scores[node] = 0.0
+            continue
+        boundary = [n for n, dist in nx.single_source_shortest_path_length(graph, node, cutoff=l).items() if dist == l]
+        scores[node] = float(strengths[node] * sum(max(0.0, strengths[v]) for v in boundary))
+    return scores
+
+
 def network_metrics(graph: nx.Graph, ci_l: int = 2) -> pd.DataFrame:
     degree = dict(graph.degree())
+    weighted_degree = dict(graph.degree(weight="count"))
     deg_cent = nx.degree_centrality(graph)
     close = nx.closeness_centrality(graph) if graph.number_of_edges() else {n: 0.0 for n in graph.nodes}
     between = nx.betweenness_centrality(graph, normalized=True) if graph.number_of_edges() else {n: 0.0 for n in graph.nodes}
     pagerank = nx.pagerank(graph) if graph.number_of_edges() else {n: 0.0 for n in graph.nodes}
     ci = collective_influence(graph, ci_l)
+    weighted_ci = weighted_collective_influence(graph, ci_l)
     rows = []
     for node in graph.nodes:
         rows.append(
             {
                 "flight_id": node,
                 "degree": degree[node],
+                "weighted_degree": weighted_degree[node],
                 "degree_centrality": deg_cent[node],
                 "closeness": close[node],
                 "betweenness": between[node],
                 "pagerank": pagerank[node],
                 "collective_influence": ci[node],
+                "weighted_collective_influence": weighted_ci[node],
             }
         )
-    return pd.DataFrame(rows).sort_values(["collective_influence", "degree", "pagerank"], ascending=False)
+    return pd.DataFrame(rows).sort_values(["weighted_collective_influence", "weighted_degree", "collective_influence", "degree", "pagerank"], ascending=False)
 
 
 def select_key_flights(metrics: pd.DataFrame, important_ratio: float, n_flights: int) -> list[int]:
+    """Select key flights on the weighted conflict network.
+
+    Ranking uses the weighted collective influence first (each conflict point
+    counts once, repeated conflicts on the same pair are counted repeatedly),
+    then the weighted degree, and only afterwards the unweighted topology
+    metrics as tie-breakers.
+    """
+
     k = max(1, int(round(float(important_ratio) * n_flights)))
-    return [int(v) for v in metrics.head(k)["flight_id"].tolist()]
+    sort_cols = [col for col in ["weighted_collective_influence", "weighted_degree", "collective_influence", "degree", "pagerank"] if col in metrics.columns]
+    ranked = metrics.sort_values(sort_cols, ascending=False) if sort_cols else metrics
+    return [int(v) for v in ranked.head(k)["flight_id"].tolist()]
 
 
 def attack_experiment(graph: nx.Graph, metrics: pd.DataFrame, metric_name: str) -> pd.DataFrame:
