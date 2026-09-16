@@ -37,6 +37,13 @@ from src.optimization_model import (
     solution_bounds_delay_speed,
 )
 from src.risk_map import generate_risk_map
+from src.stage1_continuous import (
+    InfeasibleRoute,
+    build_stage1_layout,
+    decode_stage1_solution,
+    make_stage1_objective,
+)
+from src.stage2_adm_fata import Stage2Result, adm_fata_stage2
 from src.utils import ensure_dir, set_random_seed
 from src.visualization import plot_fata_convergence, write_all_route_visuals, write_strategy_overview_html
 
@@ -48,6 +55,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--quick", action="store_true")
     parser.add_argument("--n-flights", type=int, default=None)
     parser.add_argument("--outputs", default="outputs")
+    parser.add_argument(
+        "--stage1-decision-mode",
+        choices=["discrete", "continuous_mixed"],
+        default=None,
+        help="Stage-1 decision space: discrete delay/speed indices or continuous-mixed genes.",
+    )
+    parser.add_argument(
+        "--scene",
+        choices=["legacy", "paper"],
+        default=None,
+        help="Initial scene: legacy heterogeneous traffic or the paper random scene.",
+    )
     return parser.parse_args()
 
 
@@ -133,10 +152,47 @@ def _runtime_exceeded(deadline: float) -> bool:
     return time.perf_counter() >= deadline
 
 
+def _adm_fata_step(
+    plans: list,
+    conflicts: list,
+    cfg: dict,
+    grid: AirspaceGrid,
+    risk: np.ndarray,
+    seed: int,
+    out: Path,
+) -> tuple[Stage2Result, float]:
+    started = time.perf_counter()
+    result = adm_fata_stage2(plans, conflicts, cfg, grid, risk, seed=seed)
+    elapsed = time.perf_counter() - started
+    if result.convergence:
+        pd.DataFrame(
+            {
+                "generation": range(1, len(result.convergence) + 1),
+                "best_fitness": result.convergence,
+            }
+        ).to_csv(out / "stage2_adm_fata_trace.csv", index=False)
+    return result, elapsed
+
+
+def _adm_fata_info_dict(result: Stage2Result) -> dict[str, object]:
+    return {
+        "generations": result.generations,
+        "dim": result.dim,
+        "blocks": result.blocks,
+        "accepted": result.accepted,
+        "pairs_before": result.pairs_before,
+        "points_before": result.points_before,
+        "pairs_after": result.pairs_after,
+        "points_after": result.points_after,
+    }
+
+
 def main() -> None:
     args = parse_args()
     root = Path(__file__).resolve().parent
-    cfg = load_config(root / args.config)
+    cfg = load_config(root / args.config, {"scene_mode": str(args.scene)} if args.scene is not None else None)
+    if args.stage1_decision_mode is not None:
+        cfg["optimization"]["stage1_decision_mode"] = str(args.stage1_decision_mode)
     if args.quick:
         cfg = apply_quick_overrides(cfg)
     if args.n_flights is not None:
@@ -175,11 +231,22 @@ def main() -> None:
     write_network_outputs(graph, metrics_df, attack_df, out)
 
     stage1_fata_time = 0.0
+    stage1_decision_mode = str(cfg["optimization"].get("stage1_decision_mode", "discrete"))
+    stage1_layout = None
     if key_ids and not _runtime_exceeded(deadline):
-        lb, ub = solution_bounds_delay_speed(key_ids, cfg)
+        if stage1_decision_mode == "continuous_mixed":
+            stage1_layout = build_stage1_layout(plans, key_ids, conflicts0, cfg, grid)
+            objective = make_stage1_objective(plans, stage1_layout, cfg, grid, risk)
+            lb, ub = stage1_layout.lower, stage1_layout.upper
+            print(
+                f"Stage 1 continuous-mixed decision space: dim={stage1_layout.dim} "
+                f"(strategy+ATD+per-segment speed+via genes for {len(stage1_layout.blocks)} key flights)"
+            )
+        else:
+            lb, ub = solution_bounds_delay_speed(key_ids, cfg)
 
-        def objective(vec: np.ndarray) -> float:
-            return evaluate_delay_speed_solution(vec, plans, key_ids, cfg, grid, risk).fitness
+            def objective(vec: np.ndarray) -> float:
+                return evaluate_delay_speed_solution(vec, plans, key_ids, cfg, grid, risk).fitness
 
         fata_started = time.perf_counter()
         fata_res = fata_optimize(
@@ -194,7 +261,13 @@ def main() -> None:
             parf=float(cfg["fata"]["Parf"]),
         )
         stage1_fata_time = time.perf_counter() - fata_started
-        stage1_plans = apply_delay_speed_vector(plans, key_ids, fata_res.best_position, cfg, grid, risk)
+        if stage1_decision_mode == "continuous_mixed" and stage1_layout is not None:
+            try:
+                stage1_plans = decode_stage1_solution(fata_res.best_position, plans, stage1_layout, cfg, grid, risk)
+            except InfeasibleRoute:
+                stage1_plans = [p.copy() for p in plans]
+        else:
+            stage1_plans = apply_delay_speed_vector(plans, key_ids, fata_res.best_position, cfg, grid, risk)
     else:
         fata_res = fata_optimize(lambda x: float(np.sum(x * x)), np.array([0.0]), np.array([1.0]), 1, 4, 4, seed=args.seed)
         stage1_plans = [p.copy() for p in plans]
@@ -227,6 +300,8 @@ def main() -> None:
     greedy_repair_time = 0.0
     local_reroute_time = 0.0
     stage2_independent_matching_time = 0.0
+    stage2_adm_fata_time = 0.0
+    stage2_adm_fata_info: dict[str, object] = {}
     reroute_attempts = int(cfg["optimization"].get("max_local_reroute_attempts", 20))
     reroute_enabled = not (args.quick and bool(cfg["optimization"].get("quick_disable_reroute", True)))
 
@@ -248,7 +323,7 @@ def main() -> None:
         greedy_iter_offset = max((int(row.get("iter", 0)) for row in greedy_log), default=-1) + 1
         _print_counts("Stage 2 greedy N_c", final_conflicts)
 
-    # 2.2 独立匹配策略（参考文献 [6]）：逐冲突段匹配错峰 / 速度 / 局部改航
+    # 2.2 冲突消解：独立匹配（参考文献 [6]）清扫冲突；若仍有残差，再用 ADM 策略采样 + FATA 兜底
     if not _runtime_exceeded(deadline):
         started = time.perf_counter()
         two_stage_plans, final_conflicts, adm_log = independent_matching_deconfliction(
@@ -264,6 +339,21 @@ def main() -> None:
         stage2_independent_matching_time += time.perf_counter() - started
         stage2_log.extend(adm_log)
         _print_counts("Stage 2 independent matching N_c", final_conflicts)
+        if final_conflicts and not _runtime_exceeded(deadline):
+            adm_fata_res, adm_fata_elapsed = _adm_fata_step(
+                two_stage_plans,
+                final_conflicts,
+                cfg,
+                grid,
+                risk,
+                args.seed + 206,
+                out,
+            )
+            stage2_adm_fata_time += adm_fata_elapsed
+            two_stage_plans, final_conflicts = adm_fata_res.plans, adm_fata_res.conflicts
+            stage2_log.extend(adm_fata_res.log)
+            stage2_adm_fata_info = _adm_fata_info_dict(adm_fata_res)
+            _print_counts("Stage 2 ADM+FATA N_c", final_conflicts)
 
     # 2.3 受限局部改航：仅当剩余冲突对很少时触发
     if reroute_enabled and not _runtime_exceeded(deadline):
@@ -376,6 +466,15 @@ def main() -> None:
         "stage2_delay_matches": stage2_strategy_counts["delay"],
         "stage2_speed_matches": stage2_strategy_counts["speed"],
         "stage2_reroute_matches": stage2_strategy_counts["reroute"],
+        "stage2_adm_fata_time": stage2_adm_fata_time,
+        "stage2_adm_fata_generations": int(stage2_adm_fata_info.get("generations", 0) or 0),
+        "stage2_adm_fata_dim": int(stage2_adm_fata_info.get("dim", 0) or 0),
+        "stage2_adm_fata_blocks": int(stage2_adm_fata_info.get("blocks", 0) or 0),
+        "stage2_adm_fata_accepted": bool(stage2_adm_fata_info.get("accepted", False)),
+        "stage2_adm_fata_pairs_before": int(stage2_adm_fata_info.get("pairs_before", 0) or 0),
+        "stage2_adm_fata_pairs_after": int(stage2_adm_fata_info.get("pairs_after", 0) or 0),
+        "stage2_adm_fata_points_before": int(stage2_adm_fata_info.get("points_before", 0) or 0),
+        "stage2_adm_fata_points_after": int(stage2_adm_fata_info.get("points_after", 0) or 0),
     }
     pd.DataFrame([summary]).to_csv(out / "metrics_summary.csv", index=False)
     _write_trace(out, trace)

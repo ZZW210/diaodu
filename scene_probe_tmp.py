@@ -27,7 +27,12 @@ OUT.mkdir(parents=True, exist_ok=True)
 requested = sys.argv[1:] or ["default"]
 for raw_mode in requested:
     mode = None if raw_mode == "default" else raw_mode
-    overrides = {} if mode is None else {"optimization": {"scheduler_mode": mode}}
+    if mode in {"paper", "legacy"}:
+        overrides = {"scene_mode": mode}
+    elif mode is None:
+        overrides = {}
+    else:
+        overrides = {"optimization": {"scheduler_mode": mode}}
     try:
         cfg = load_config(ROOT / "config.yaml", overrides)
         env_seed = int(cfg.get("environment_seed", cfg["flight"].get("random_seed", 2025)))

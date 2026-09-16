@@ -17,6 +17,7 @@ class FATAResult:
     convergence: list[float]
     remaining_conflicts: list[float]
     delay_count: list[float]
+    best_context: np.ndarray | None = None
 
 
 def _is_prime(n: int) -> bool:
@@ -57,7 +58,23 @@ def fata_optimize(
     parf: float = 0.2,
     callback: Callable[[np.ndarray, float, int], dict[str, float]] | None = None,
     objective_with_iter: ObjectiveWithIter | None = None,
+    generation_context: Callable[[int, int, np.random.Generator], np.ndarray] | None = None,
+    objective_with_context: Callable[[np.ndarray, int, np.ndarray], float] | None = None,
+    on_generation_evaluated: Callable[[int, np.ndarray, np.ndarray, np.ndarray], None] | None = None,
 ) -> FATAResult:
+    """Improved FATA search.
+
+    The three optional hooks mirror the desktop project's ADM coupling and keep
+    the default behaviour unchanged when they are omitted:
+
+    - ``generation_context(generation, size, rng)`` samples one discrete context
+      (strategy labels) per individual before the population is evaluated.
+    - ``objective_with_context(vector, generation, context)`` evaluates an
+      individual under its sampled context instead of the plain objective.
+    - ``on_generation_evaluated(generation, positions, fitness, contexts)`` runs
+      after the population of a generation was evaluated, e.g. to update an ADM
+      probability matrix from the dominant individuals.
+    """
     rng = np.random.default_rng(seed)
     lb_arr = np.full(dim, lb, dtype=float) if np.isscalar(lb) else np.asarray(lb, dtype=float)
     ub_arr = np.full(dim, ub, dtype=float) if np.isscalar(ub) else np.asarray(ub, dtype=float)
@@ -83,13 +100,24 @@ def fata_optimize(
             return float(objective_with_iter(x, iteration))
         return float(objective(x))
 
+    best_context: np.ndarray | None = None
     for it in range(1, max_iter + 1):
+        contexts = None
+        if generation_context is not None:
+            contexts = np.asarray(generation_context(it, no_p, rng))
         for i in range(no_p):
             flight[i] = np.clip(flight[i], lb_arr, ub_arr)
-            fitness[i] = _evaluate(flight[i], it)
+            if contexts is not None and objective_with_context is not None:
+                fitness[i] = float(objective_with_context(flight[i], it, contexts[i]))
+            else:
+                fitness[i] = _evaluate(flight[i], it)
             if fitness[i] < best_score:
                 best_score = float(fitness[i])
                 best_pos = flight[i].copy()
+                if contexts is not None:
+                    best_context = np.array(contexts[i], copy=True)
+        if on_generation_evaluated is not None and contexts is not None:
+            on_generation_evaluated(it, flight, fitness, contexts)
 
         order = np.sort(fitness)
         worst_fitness = float(order[-1])
@@ -121,12 +149,20 @@ def fata_optimize(
         if improved and dim > 0:
             scale = (ub_arr - lb_arr) * max(0.015, 0.18 * (1.0 - progress))
             local_count = min(4, max(1, no_p // 12))
-            for _ in range(local_count):
+            local_contexts = None
+            if generation_context is not None:
+                local_contexts = np.asarray(generation_context(it, local_count, rng))
+            for li in range(local_count):
                 candidate = np.clip(best_pos + rng.normal(0.0, scale, dim), lb_arr, ub_arr)
-                candidate_fit = _evaluate(candidate, it)
+                if local_contexts is not None and objective_with_context is not None:
+                    candidate_fit = float(objective_with_context(candidate, it, local_contexts[li]))
+                else:
+                    candidate_fit = _evaluate(candidate, it)
                 if candidate_fit < best_score:
                     best_score = float(candidate_fit)
                     best_pos = candidate.copy()
+                    if local_contexts is not None:
+                        best_context = np.array(local_contexts[li], copy=True)
                     worst_idx = int(np.argmax(fitness))
                     flight[worst_idx] = candidate
                     fitness[worst_idx] = candidate_fit
@@ -137,7 +173,7 @@ def fata_optimize(
             remaining_conflicts.append(float(info.get("remaining_conflicts", np.nan)))
             delay_count.append(float(info.get("delay_count", np.nan)))
 
-    return FATAResult(best_pos, best_score, convergence, remaining_conflicts, delay_count)
+    return FATAResult(best_pos, best_score, convergence, remaining_conflicts, delay_count, best_context)
 
 
 def sphere_objective(x: np.ndarray) -> float:

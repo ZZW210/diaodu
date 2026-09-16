@@ -13,7 +13,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .astar_3d import astar_path
+from .astar_3d import astar_distance_unit_m, astar_path
 from .grid import AirspaceGrid, GridPoint
 from .utils import ensure_dir, path_distance_m, safe_tqdm
 
@@ -929,7 +929,118 @@ def generate_initial_flight_plans(seed: int = 2025, n_flights: int | None = None
     return generate_flight_plans(grid, risk_map, cfg, output_dir=output_dir, n_flights=n_flights, seed=seed)
 
 
+@dataclass(frozen=True)
+class PaperTrafficTask:
+    id: int
+    start: GridPoint
+    goal: GridPoint
+    etd: float
+    speed: float
+
+
+def sample_paper_random_traffic(
+    grid: AirspaceGrid,
+    cfg: dict,
+    n_flights: int | None = None,
+    seed: int | None = None,
+) -> list[PaperTrafficTask]:
+    """Freeze OD/ETD before A*: risk and distance scale never consume traffic RNG."""
+
+    scene = cfg.get("paper_scene", {})
+    fg = cfg["flight_generation"]
+    n = int(n_flights if n_flights is not None else fg.get("n_flights", 100))
+    traffic_seed = int(seed if seed is not None else cfg.get("traffic_seed", cfg["flight"]["random_seed"]))
+    rng = np.random.default_rng(traffic_seed + 101)
+    target = float(fg.get("distance_target_m", 6000.0))
+    tolerance = float(fg.get("distance_tolerance_m", 1200.0))
+    takeoff = scene.get("takeoff", {"min": 0.0, "max": 1800.0})
+    speed = float(scene.get("initial_speed", {}).get("value", 10.0))
+    tasks: list[PaperTrafficTask] = []
+    for plan_id in range(n):
+        start: GridPoint = (0, 0, 0)
+        goal: GridPoint = (0, 0, 0)
+        for _ in range(int(fg.get("max_sampling_attempts", 30000))):
+            start = (int(rng.integers(grid.shape[0])), int(rng.integers(grid.shape[1])), 0)
+            goal = (int(rng.integers(grid.shape[0])), int(rng.integers(grid.shape[1])), 0)
+            if grid.is_free(start) and grid.is_free(goal) and abs(_cell_distance_m(start, goal, grid) - target) <= tolerance:
+                break
+        else:
+            raise RuntimeError(f"Paper random OD sampling exhausted for flight {plan_id}; tolerance unchanged")
+        tasks.append(
+            PaperTrafficTask(
+                plan_id,
+                start,
+                goal,
+                float(rng.uniform(float(takeoff["min"]), float(takeoff["max"]))),
+                speed,
+            )
+        )
+    return tasks
+
+
+def plan_paper_random_traffic(grid: AirspaceGrid, risk_map: np.ndarray, cfg: dict, tasks: list[PaperTrafficTask]) -> list[FlightPlan]:
+    """Replan a fixed task table; a failed path aborts instead of resampling OD."""
+
+    weights = cfg.get("paper_scene", {}).get("astar", {})
+    unit = astar_distance_unit_m(str(cfg.get("astar_distance_scale_mode", "meter")), grid.cell_size[0])
+    plans: list[FlightPlan] = []
+    for task in tasks:
+        path = astar_path(
+            grid,
+            task.start,
+            task.goal,
+            risk_map,
+            alpha_r=float(weights.get("risk_weight", 0.8)),
+            alpha_l=float(weights.get("distance_weight", 0.2)),
+            distance_unit_m=unit,
+        )
+        if not path:
+            raise RuntimeError(f"Fixed OD has no A* path for flight {task.id}; traffic and tolerance unchanged")
+        eta = compute_eta_times(path, task.etd, task.speed, grid.cell_size)
+        plans.append(
+            FlightPlan(
+                id=task.id,
+                start=task.start,
+                goal=task.goal,
+                path=path,
+                etd=task.etd,
+                eta_times=eta,
+                speed_profile=[task.speed] * max(0, len(path) - 1),
+                risk_sum=float(sum(risk_map[p] for p in path)),
+                total_air_time=max(0.0, eta[-1] - task.etd),
+                generation_mode="paper_random",
+                start_ground=task.start,
+                goal_ground=task.goal,
+                start_level=0,
+                goal_level=0,
+                cruise_level=max(p[2] for p in path),
+            )
+        )
+    return plans
+
+
+def generate_paper_random_flight_tasks(
+    grid: AirspaceGrid,
+    risk_map: np.ndarray,
+    cfg: dict,
+    output_dir: str | Path | None = None,
+    n_flights: int | None = None,
+    seed: int | None = None,
+) -> list[FlightPlan]:
+    tasks = sample_paper_random_traffic(grid, cfg, n_flights=n_flights, seed=seed)
+    plans = plan_paper_random_traffic(grid, risk_map, cfg, tasks)
+    if output_dir is not None:
+        out = ensure_dir(output_dir)
+        with (out / "initial_plans.pkl").open("wb") as fh:
+            pickle.dump(plans, fh)
+        plot_routes_3d(grid, plans, out / "initial_routes.png", title="Initial 4D flight routes")
+        _write_generation_diagnostics(out, grid, plans, np.empty((0, 2)), [])
+    return plans
+
+
 def generate_flight_plans(grid: AirspaceGrid, risk_map: np.ndarray, cfg: dict, output_dir: str | Path | None = None, n_flights: int | None = None, seed: int | None = None) -> list[FlightPlan]:
+    if cfg.get("flight_generation", {}).get("mode") == "paper_random":
+        return generate_paper_random_flight_tasks(grid, risk_map, cfg, output_dir, n_flights, seed)
     if cfg.get("flight_generation", {}).get("mode") == "heterogeneous_random":
         return generate_heterogeneous_flight_tasks(grid, risk_map, cfg, output_dir, n_flights=n_flights, seed=seed)
 
