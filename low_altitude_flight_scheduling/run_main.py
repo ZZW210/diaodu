@@ -61,12 +61,6 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Stage-1 decision space: discrete delay/speed indices or continuous-mixed genes.",
     )
-    parser.add_argument(
-        "--scene",
-        choices=["legacy", "paper"],
-        default=None,
-        help="Initial scene: legacy heterogeneous traffic or the paper random scene.",
-    )
     return parser.parse_args()
 
 
@@ -190,7 +184,7 @@ def _adm_fata_info_dict(result: Stage2Result) -> dict[str, object]:
 def main() -> None:
     args = parse_args()
     root = Path(__file__).resolve().parent
-    cfg = load_config(root / args.config, {"scene_mode": str(args.scene)} if args.scene is not None else None)
+    cfg = load_config(root / args.config)
     if args.stage1_decision_mode is not None:
         cfg["optimization"]["stage1_decision_mode"] = str(args.stage1_decision_mode)
     if args.quick:

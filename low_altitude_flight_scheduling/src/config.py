@@ -156,30 +156,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "greedy_reroute_attempts": 3,
         "quick_repair_rounds": 120,
     },
-    "scene_mode": "legacy",
-    "astar_distance_scale_mode": "meter",
-    "population": {
-        "window_size": 10,
-        "min_center_spacing_m": 1000,
-        "n_population_centers": 4,
-        "beta": 2.0,
-    },
-    "paper_scene": {
-        "generation_mode": "paper_random",
-        "n_flights": 100,
-        "distance_target_m": 6000,
-        "distance_tolerance_m": 1200,
-        "takeoff": {"mode": "uniform", "min": 0, "max": 1800},
-        "initial_speed": {"mode": "constant", "value": 10.0},
-        "astar": {"risk_weight": 0.8, "distance_weight": 0.2},
-        "conflict": {
-            "t_conflict": 30.0,
-            "cell_occupancy_time": 0.0,
-            "alpha": 0.05,
-            "sigma0": 1.0,
-            "sigma_rate": 0.010,
-        },
-    },
     "paper_encoding": {
         "local_window_segments": 4,
         "reroute_merge_window": 5,
@@ -277,22 +253,6 @@ def load_config(path: str | Path = "config.yaml", overrides: dict[str, Any] | No
         cfg = deep_update(cfg, loaded)
     if overrides:
         cfg = deep_update(cfg, overrides)
-    scene_mode = str(cfg.get("scene_mode", "legacy"))
-    if scene_mode == "paper":
-        scene = cfg.get("paper_scene", {})
-        fg = cfg.setdefault("flight_generation", {})
-        fg["mode"] = str(scene.get("generation_mode", "paper_random"))
-        fg["n_flights"] = int(scene.get("n_flights", 100))
-        fg["distance_target_m"] = float(scene.get("distance_target_m", 6000.0))
-        fg["distance_tolerance_m"] = float(scene.get("distance_tolerance_m", 1200.0))
-        cfg["flight"]["n_flights"] = fg["n_flights"]
-        cfg["conflict"].update(scene.get("conflict", {}))
-        cfg["population_model"] = "reference28_gravity"
-        cfg["astar_distance_scale_mode"] = "meter"
-    elif scene_mode == "legacy":
-        cfg["population_model"] = "old_gaussian"
-    else:
-        raise ValueError(f"Unknown scene_mode: {scene_mode}")
     return cfg
 
 

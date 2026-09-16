@@ -144,38 +144,6 @@ optimization:
   greedy_reroute_attempts: 3
   quick_repair_rounds: 120
 
-# Scene selection: "legacy" keeps the heterogeneous traffic + Gaussian population;
-# "paper" reproduces the desktop paper scene (uniform takeoff, constant speed, gravity population).
-scene_mode: "legacy"
-
-paper_scene:
-  generation_mode: "paper_random"
-  n_flights: 100
-  distance_target_m: 6000
-  distance_tolerance_m: 1200
-  takeoff:
-    mode: "uniform"
-    min: 0
-    max: 1800
-  initial_speed:
-    mode: "constant"
-    value: 10.0
-  astar:
-    risk_weight: 0.8
-    distance_weight: 0.2
-  conflict:
-    t_conflict: 30.0
-    cell_occupancy_time: 0.0
-    alpha: 0.05
-    sigma0: 1.0
-    sigma_rate: 0.010
-
-population:
-  window_size: 10
-  min_center_spacing_m: 1000
-  n_population_centers: 4
-  beta: 2.0
-
 # Continuous-mixed stage-1 encoding (ported from the desktop project).
 paper_encoding:
   local_window_segments: 4
