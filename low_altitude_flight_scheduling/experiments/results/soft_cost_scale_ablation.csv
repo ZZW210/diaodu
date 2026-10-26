@@ -1,0 +1,5 @@
+run,seed,initial_pairs,initial_points,stage1_points,final_pairs,final_points,changed_flights,delayed_flights,total_delay_s,abs_delay_s,air_time_s,fata_time_s,runtime_s,greedy_accepted,im_accepted,total_accepted,soft_cost_scale
+outputs_ab30_s2025,2025,114,188,101,0,0,47,15,10577.3,13601.1,58639.6,26.3,146.0,202,13,216,1
+outputs_soft10,,114,188,101,0,0,47,15,10577.3,13601.1,58639.6,26.1,123.2,202,13,216,10
+outputs_soft100,,114,188,101,0,0,47,15,10577.3,13601.1,58639.7,25.9,122.7,202,13,216,100
+outputs_soft1000,,114,188,102,0,0,47,16,10245.4,12882.7,58812.4,28.0,124.4,206,12,219,1000

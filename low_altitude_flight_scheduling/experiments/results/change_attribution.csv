@@ -1,0 +1,7 @@
+first_touch_stage,final_strategy,flights,total_positive_delay_s
+greedy_time,delay,20,3300.0
+greedy_time,reroute+delay,3,390.0
+greedy_time,speed,3,0.0
+stage1,delay,9,6887.3
+stage1,speed,1,0.0
+stage2_independent_matching,reroute,11,0.0

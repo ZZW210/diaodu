@@ -1,0 +1,6 @@
+run,seed,initial_pairs,initial_points,stage1_points,final_pairs,final_points,changed_flights,delayed_flights,total_delay_s,abs_delay_s,air_time_s,fata_time_s,runtime_s,greedy_accepted,im_accepted,total_accepted,accept_soft_weight
+outputs_ab30_s2025,2025,114,188,101,0,0,47,15,10577.3,13601.1,58639.6,26.3,146.0,202,13,216,lexicographic (old)
+outputs_acc1,,114,188,101,0,0,47,15,10577.3,13601.1,58639.6,35.3,152.1,229,13,243,1
+outputs_acc1000,,114,188,101,0,0,47,15,10577.3,13601.1,58639.6,35.6,153.6,218,13,232,1000
+outputs_acc5000,,114,188,101,0,0,47,15,10577.3,13601.1,58639.6,35.5,153.2,208,13,222,5000
+outputs_acc20000,,114,188,101,0,0,47,15,10577.3,13601.1,58639.6,34.9,151.1,208,13,222,20000
