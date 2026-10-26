@@ -109,6 +109,18 @@ for r in trace:
     stages[r["stage"]] = stages.get(r["stage"], 0) + 1
 last_pairs = trace[-1]["new_pairs"]
 
+# 残留冲突摘要（结论章节使用）
+if unresolved:
+    un_pairs = "、".join(f"{r['plan_a']}-{r['plan_b']}" for r in unresolved)
+    un_gaps = [float(r["required_gap"]) for r in unresolved]
+    un_txt = (
+        f"{len(unresolved)} 个冲突点（涉及航班对 {un_pairs}）因所需安全间隔"
+        f"（{min(un_gaps):.0f}~{max(un_gaps):.0f} s）远大于实际时间差而无法在安全模式下消除，"
+        "可作为后续研究（如更大幅度的改航或分层调度）的优化对象。"
+    )
+else:
+    un_txt = "全部冲突已消除。"
+
 # ---------------------------------------------------------------- HTML 组装
 html_parts = []
 html_parts.append(
@@ -357,7 +369,7 @@ html_parts.append(
 <div class="tbl-scroll">{table(
     ["航班 ID", "度", "介数", "PageRank", "接近中心性", "集体影响力 CI"],
     top10_rows,
-    "冲突网络 Top-10 关键航班（按 CI 降序）。最高 CI 航班 99（度 6，CI 135）是最关键的冲突枢纽。",
+    f"冲突网络 Top-10 关键航班（按 CI 降序）。最高 CI 航班 {top10[0]['flight_id']}（度 {top10[0]['degree']}，CI {fmt(float(top10[0]['collective_influence']), 0)}）是最关键的冲突枢纽。",
 )}</div>
 </div>
 <div class="figure-grid">
@@ -401,10 +413,10 @@ html_parts.append(
     ("优化轨迹记录行数", f"{len(trace)} 行"),
     ("贪心延迟/速度调整动作数", f"{stages.get('greedy_time', 0)} 行"),
     ("局部改航动作数", f"{stages.get('local_reroute', 0)} 行"),
-    ("冲突对变化（起 → 终）", f"{trace[0]['old_pairs']} → {trace[-1]['new_pairs']} 对"),
+    ("冲突对变化（起 → 终）", f"{trace[0]['old_pairs']} → {fin2_p} 对"),
     ("累计接受 / 拒绝 / 回滚动作", f"{m['accepted_actions']} / {m['rejected_actions']} / {m['rollback_count']}"),
 ])}
-<p>安全模式下大量候选动作被拒绝并回滚（{m['rollback_count']} 次），保证每一步都不使全局冲突恶化；最终冲突对从 <b>{trace[0]['old_pairs']}</b> 降至 <b>{trace[-1]['new_pairs']}</b>。</p>
+<p>安全模式下大量候选动作被拒绝并回滚（{m['rollback_count']} 次），保证每一步都不使全局冲突恶化；最终冲突对从 <b>{trace[0]['old_pairs']}</b> 降至 <b>{fin2_p}</b>。</p>
 </div>
 <div class="figure-grid">
 {img_tag('two_stage_routes_before_after.png', '两阶段优化前后航迹', '两阶段优化前后航迹对比')}
@@ -501,11 +513,11 @@ html_parts.append(
         "diagnosis",
         f"""
 <div class="grid2">
-<div class="card"><h3>未解决的 4 个冲突点</h3>
+<div class="card"><h3>未解决的 {len(unresolved)} 个冲突点</h3>
 <div class="tbl-scroll">{table(
     ["航班 A", "航班 B", "栅格 (x,y,z)", "时间差 (s)", "所需间隔 (s)", "失败原因"],
     un_rows,
-    "这些冲突在贪心延迟/速度与局部改航尝试后仍无法消除（时间差远小于所需安全间隔，且改航会引入新冲突），已按安全模式保留。",
+    "这些冲突在贪心延迟/速度与局部改航尝试后仍无法消除（实际时间差远小于所需安全间隔），已按安全模式保留。",
 )}</div>
 </div>
 <div class="card"><h3>最终冲突对详情</h3>
@@ -522,7 +534,7 @@ html_parts.append(
   <div class="kpi"><div class="v">{m['accepted_actions']} / {m['rollback_count']}</div><div class="k">接受动作 / 回滚次数</div></div>
 </div>
 <p style="font-size:13.5px;color:var(--muted);margin-top:12px">
-安全模式（safe_mode=true）下，每个候选动作都需通过全局冲突对检查；无法减少冲突对的候选被回滚，从而保证优化单调不劣化。A* 调用仅 20 次，说明大部分冲突通过延迟/速度即可解决，只有极少数需要局部改航。</p>
+安全模式（safe_mode=true）下，每个候选动作都需通过全局冲突对检查；无法减少冲突对的候选被回滚，从而保证优化单调不劣化。A* 调用仅 {m['number_of_astar_calls']} 次，说明大部分冲突通过延迟/速度即可解决，只有极少数需要局部改航。</p>
 </div>
 """,
     )
@@ -539,7 +551,7 @@ html_parts.append(
 <li><b>冲突治理效果显著</b>：两阶段调度将含不确定性冲突从 <b>{ini_u} 点 / {ini_p_u} 对</b> 降至 <b>{fin2} 点 / {fin2_p} 对</b>（消除率 {elim2_point:.1f}% / {elim2_pair:.1f}%），且仅 {m['changed_flight_count_two_stage']} 架航班被调整、{m['delayed_flight_count']} 架延误，风险增量比仅 {float(m['risk_increase_ratio']):.2e}。</li>
 <li><b>两阶段优于单阶段</b>：仅延迟+速度可消除 {elim1_point:.1f}% 冲突点；叠加局部改航后提升至 {elim2_point:.1f}%，证明“延迟/速度为主、局部改航兜底”的策略有效性。</li>
 <li><b>改进 FATA 有效</b>：佳点集初始化使改进 FATA 均值优于原始 FATA（{fmt(float(imp['mean']),4)} vs {fmt(float(org['mean']),4)}），并优于 PSO；GA 在当前配置下发散，需另行调参。</li>
-<li><b>残留冲突</b>：4 个冲突点（涉及航班对 4-56、14-29、16-58、45-67）因所需安全间隔（70~95 s）远大于实际时间差而无法在安全模式下消除，可作为后续研究（如更大幅度的改航或分层调度）的优化对象。</li>
+<li><b>残留冲突</b>：{un_txt}</li>
 <li><b>口径说明</b>：本报告为算法级复现的随机场景结果，初始冲突数（{ini_u} 点）与论文参考值（约 97 点）存在差异，属场景参数差异而非硬编码，可通过调参逼近。</li>
 </ul>
 </div>

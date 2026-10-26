@@ -330,7 +330,7 @@ def write_fata_3d_html(
                     y=ground_pts[:, 1],
                     z=ground_pts[:, 2],
                     mode="markers",
-                    marker=dict(size=6, color=[palette[plan.id % len(palette)], "#111111"], symbol=["circle", "x"]),
+                    marker=dict(size=3.5, color=[palette[plan.id % len(palette)], "#111111"], symbol=["circle", "x"]),
                     name=f"{label} 地面起终点",
                     hovertext=[f"{label} 地面起点", f"{label} 地面终点"],
                     hovertemplate="%{hovertext}<br>X: %{x:.0f} m<br>Y: %{y:.0f} m<br>高度: %{z:.0f} m<extra></extra>",
