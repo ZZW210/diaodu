@@ -75,7 +75,7 @@ astar:
 
 conflict:
   t_conflict: 30.0
-  cell_occupancy_time: 15.0
+  cell_occupancy_time: 0.0
   alpha: 0.05
   sigma0: 2.0
   sigma_rate: 0.025
@@ -109,6 +109,7 @@ optimization:
   stage2_repair_rounds: 20
   stage2_strategy: "independent_matching"
   stage2_fata_generations: 60  # 残差兜底 ADM+FATA 的迭代代数（matching 后仍有残差才触发）
+  stage2_fata_min_pairs: 3  # 仅当残余冲突对 >= 3 时先触发 FATA，少量残差先交给改航/收尾贪心
   stage2_fata_dominant_fraction: 0.2
   stage2_fata_learning_rate: 0.5
   independent_matching_rounds: 20
@@ -139,6 +140,15 @@ optimization:
   force_shift_candidates: [-300, -240, -180, -120, -90, -60, -30, 30, 60, 90, 120, 180, 240, 300, 420, 600]
   delay_count_threshold: 30
   delay_count_cap: 3
+  soft_cost_scale: 1.0  # 软成本整体权重：fitness = 1e6*冲突对 + 1e4*冲突点 + soft_cost_scale*软成本
+  accept_pair_weight: 1000000.0  # 动作接受准则：冲突对权重
+  accept_point_weight: 10000.0  # 动作接受准则：冲突点权重
+  accept_soft_weight: 1.0  # 动作接受准则：软成本权重（调大可抑制过度调整）
+  soft_delay_weight: 0.001
+  soft_air_weight: 0.0001
+  soft_risk_weight: 0.0001
+  soft_changed_weight: 10.0
+  soft_delayed_weight: 25.0
   greedy_flights_per_round: 2
   greedy_candidate_limit: 6
   greedy_reroute_attempts: 3

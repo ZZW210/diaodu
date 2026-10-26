@@ -296,6 +296,8 @@ def main() -> None:
     stage2_independent_matching_time = 0.0
     stage2_adm_fata_time = 0.0
     stage2_adm_fata_info: dict[str, object] = {}
+    fata_min_pairs = int(cfg["optimization"].get("stage2_fata_min_pairs", 3))
+    fata_ran = False
     reroute_attempts = int(cfg["optimization"].get("max_local_reroute_attempts", 20))
     reroute_enabled = not (args.quick and bool(cfg["optimization"].get("quick_disable_reroute", True)))
 
@@ -333,7 +335,11 @@ def main() -> None:
         stage2_independent_matching_time += time.perf_counter() - started
         stage2_log.extend(adm_log)
         _print_counts("Stage 2 independent matching N_c", final_conflicts)
-        if final_conflicts and not _runtime_exceeded(deadline):
+        if (
+            final_conflicts
+            and count_conflict_pairs(final_conflicts) >= fata_min_pairs
+            and not _runtime_exceeded(deadline)
+        ):
             adm_fata_res, adm_fata_elapsed = _adm_fata_step(
                 two_stage_plans,
                 final_conflicts,
@@ -347,6 +353,7 @@ def main() -> None:
             two_stage_plans, final_conflicts = adm_fata_res.plans, adm_fata_res.conflicts
             stage2_log.extend(adm_fata_res.log)
             stage2_adm_fata_info = _adm_fata_info_dict(adm_fata_res)
+            fata_ran = True
             _print_counts("Stage 2 ADM+FATA N_c", final_conflicts)
 
     # 2.3 受限局部改航：仅当剩余冲突对很少时触发
@@ -398,6 +405,24 @@ def main() -> None:
         local_reroute_time += time.perf_counter() - started
         stage2_log.extend(tail_reroute_log)
         _print_counts("Stage 2 tail reroute N_c", final_conflicts)
+
+    # 2.6 最终兜底：少量残差未能在前序步骤消解时，再用 ADM+FATA 收一次
+    if final_conflicts and not fata_ran and not _runtime_exceeded(deadline):
+        adm_fata_res, adm_fata_elapsed = _adm_fata_step(
+            two_stage_plans,
+            final_conflicts,
+            cfg,
+            grid,
+            risk,
+            args.seed + 206,
+            out,
+        )
+        stage2_adm_fata_time += adm_fata_elapsed
+        two_stage_plans, final_conflicts = adm_fata_res.plans, adm_fata_res.conflicts
+        stage2_log.extend(adm_fata_res.log)
+        stage2_adm_fata_info = _adm_fata_info_dict(adm_fata_res)
+        fata_ran = True
+        _print_counts("Stage 2 final ADM+FATA N_c", final_conflicts)
 
     _append_trace(trace, "stage2_independent_matching", stage2_log)
     _print_counts("Stage 2 N_c", final_conflicts)

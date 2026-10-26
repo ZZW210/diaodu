@@ -221,7 +221,7 @@ def evaluate_delay_speed_solution(
     total_delay = float(sum(max(0.0, p.delay) for p in new_plans))
     total_air = float(sum(p.total_air_time for p in new_plans))
     total_risk = float(sum(p.risk_sum for p in new_plans))
-    soft = _soft_cost(new_plans, cfg)
+    soft = _soft_cost(new_plans, cfg) * float(cfg["optimization"].get("soft_cost_scale", 1.0))
     fitness = float(
         1_000_000.0 * pairs
         + 10_000.0 * points
@@ -233,15 +233,21 @@ def evaluate_delay_speed_solution(
 
 
 def _soft_cost(plans: list[FlightPlan], cfg: dict) -> float:
+    opt = cfg.get("optimization", {})
+    delay_w = float(opt.get("soft_delay_weight", 0.001))
+    air_w = float(opt.get("soft_air_weight", 0.0001))
+    risk_w = float(opt.get("soft_risk_weight", 0.0001))
+    changed_w = float(opt.get("soft_changed_weight", 10.0))
+    delayed_w = float(opt.get("soft_delayed_weight", 25.0))
     delay = float(sum(max(0.0, p.delay) for p in plans))
     air = float(sum(p.total_air_time for p in plans))
     risk = float(sum(p.risk_sum for p in plans))
     return (
-        0.001 * delay
-        + 0.0001 * air
-        + 0.0001 * risk
-        + 10.0 * changed_count(plans)
-        + 25.0 * delayed_count(plans, float(cfg["optimization"].get("delay_count_threshold", 30.0)))
+        delay_w * delay
+        + air_w * air
+        + risk_w * risk
+        + changed_w * changed_count(plans)
+        + delayed_w * delayed_count(plans, float(cfg["optimization"].get("delay_count_threshold", 30.0)))
     )
 
 
@@ -286,14 +292,14 @@ def try_apply_action_with_rollback(
     new_pairs = count_conflict_pairs(new_conflicts)
     new_points = count_conflict_points(new_conflicts)
     new_soft = _soft_cost(trial, cfg)
-    accepted = False
-    reason = "rollback"
-    if new_pairs < old_pairs:
-        accepted = True
-        reason = "pairs_decreased"
-    elif new_pairs == old_pairs and new_points <= old_points and new_soft < old_soft - 1e-9:
-        accepted = True
-        reason = "soft_decreased"
+    opt_cfg = cfg.get("optimization", {})
+    pair_w = float(opt_cfg.get("accept_pair_weight", 1_000_000.0))
+    point_w = float(opt_cfg.get("accept_point_weight", 10_000.0))
+    soft_w = float(opt_cfg.get("accept_soft_weight", 1.0))
+    old_score = pair_w * old_pairs + point_w * old_points + soft_w * old_soft
+    new_score = pair_w * new_pairs + point_w * new_points + soft_w * new_soft
+    accepted = bool(new_pairs <= old_pairs and new_score < old_score - 1e-9)
+    reason = "score_decreased" if accepted else "rollback"
     if accepted and new_pairs > old_pairs:
         raise AssertionError("Accepted action increased global conflict pairs.")
     log = _action_log(action_type, fid, old_pairs, new_pairs, old_points, new_points, accepted, started, reason)

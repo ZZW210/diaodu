@@ -314,7 +314,7 @@ def evaluate_stage2_solution(
     conflicts = detect_conflicts(decoded, cfg, uncertain=True)
     pairs = count_conflict_pairs(conflicts)
     points = count_conflict_points(conflicts)
-    soft = _soft_cost(decoded, cfg)
+    soft = _soft_cost(decoded, cfg) * float(cfg["optimization"].get("soft_cost_scale", 1.0))
     fitness = float(1_000_000.0 * pairs + 10_000.0 * points + soft)
     total_delay = float(sum(max(0.0, p.delay) for p in decoded))
     total_air = float(sum(p.total_air_time for p in decoded))
