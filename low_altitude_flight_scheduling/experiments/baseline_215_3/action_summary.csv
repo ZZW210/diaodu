@@ -1,0 +1,15 @@
+config,stage,action_type,attempts,accepted,rollback
+baseline_215_3,greedy_time,delay,456,142,314
+baseline_215_3,greedy_time,speed,190,31,159
+baseline_215_3,local_reroute,reroute,36,8,28
+baseline_215_3,stage2_independent_matching,cruise_level,50,13,37
+baseline_215_3,stage2_independent_matching,delay,19,1,18
+baseline_215_3,stage2_independent_matching,reroute,5,5,0
+baseline_215_3,stage2_independent_matching,speed,12,3,9
+innovation1_215_0,greedy_time,delay,504,153,351
+innovation1_215_0,greedy_time,speed,210,49,161
+innovation1_215_0,local_reroute,reroute,26,6,20
+innovation1_215_0,stage2_independent_matching,cruise_level,37,11,26
+innovation1_215_0,stage2_independent_matching,delay,30,4,26
+innovation1_215_0,stage2_independent_matching,reroute,4,2,2
+innovation1_215_0,stage2_independent_matching,speed,22,6,16

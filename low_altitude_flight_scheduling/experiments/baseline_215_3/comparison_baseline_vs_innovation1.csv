@@ -1,0 +1,3 @@
+config,initial_points,initial_pairs,stage1_points,stage1_pairs,final_points,final_pairs,changed_two_stage,changed_stage1,delayed_flights,total_positive_delay_s,abs_delay_s,air_time_change_s,runtime_s,stage1_fata_s,greedy_s,independent_matching_s,local_reroute_s,accepted_actions,rejected_actions,rollback_count,stage2_delay_matches,stage2_speed_matches,stage2_reroute_matches,final_fitness,risk_increase_ratio,key_conflict_coverage
+baseline_215_3,215,132,160,92,3,3,53,10,21,7110.0,9270.0,-297.0,86.43,71.67,6.27,1.04,4.01,203,565,565,1,3,18,3031068.07,0.00104,64/215
+innovation1_215_0,215,132,155,98,0,0,53,10,18,5880.0,9000.0,-409.0,83.19,70.92,7.3,1.12,0.4,231,602,602,4,6,13,991.82,0.000825,85/215
